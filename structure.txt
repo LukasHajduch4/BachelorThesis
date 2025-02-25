@@ -1,0 +1,38 @@
+projekt/
+│
+├── detectors/                 # Rôzne implementácie detektorov objektov
+│   ├── __init__.py
+│   ├── base_detector.py       # Abstraktná základná trieda pre detektory
+│   ├── yolo_world_detector.py # Implementácia pre YOLO World
+│   ├── detic_detector.py      # Implementácia pre DETIC
+│   └── owlvit_detector.py     # Implementácia pre OwlViT
+│
+├── pointing/                  # Komponenty pre detekciu ukazovania
+│   ├── __init__.py
+│   ├── hand_detector.py       # Detekcia ruky a prstov
+│   └── pointing_analyzer.py   # Analýza smeru ukazovania
+│
+├── stereo/                    # Komponenty pre stereo videnie
+│   ├── __init__.py
+│   ├── calibration.py         # Nástroje pre kalibráciu kamier
+│   └── stereo_processor.py    # Spracovanie stereo obrazu a 3D rekonštrukcia
+│
+├── system/                    # Integrácia všetkých komponentov
+│   ├── __init__.py
+│   └── main_system.py         # Hlavná systémová trieda
+│
+├── utils/                     # Pomocné nástroje a utility
+│   ├── __init__.py
+│   ├── visualization.py       # Nástroje pre vizualizáciu
+│   └── evaluation.py          # Nástroje pre vyhodnotenie
+│
+├── config/                    # Konfiguračné súbory
+│   ├── camera_params.json     # Parametre kamier
+│   └── models_config.json     # Konfigurácia modelov
+│
+├── data/                      # Adresár pre dáta
+│   ├── images/                # Testovacie obrázky
+│   └── evaluation/            # Evaluačný dataset
+│
+├── main.py                    # Hlavný spúšťací skript
+└── requirements.txt           # Zoznam závislostí
