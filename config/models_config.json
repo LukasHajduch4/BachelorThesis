@@ -1,0 +1,6 @@
+{
+    "yolo_world": {
+        "model_name": "yolo_world_l",
+        "confidence_threshold": 0.5
+    }
+}
