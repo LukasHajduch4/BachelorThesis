@@ -3,3 +3,8 @@ mediapipe
 opencv-python
 numpy
 yoloworld
+transformers
+pillow
+requests
+clip-openai
+segment-anything
