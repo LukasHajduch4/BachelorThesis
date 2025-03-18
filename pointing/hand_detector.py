@@ -4,12 +4,12 @@ import numpy as np
 
 class HandPointingDetector:
     """
-    Detektor ruky a smeru ukazovania pomocou MediaPipe.
+    Detects hands and pointing direction using MediaPipe.
     """
     
     def __init__(self):
         """
-        Inicializácia detektora ruky.
+        Initialize the hand detector.
         """
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
@@ -22,117 +22,164 @@ class HandPointingDetector:
         
     def detect_hands(self, image):
         """
-        Detekcia rúk v obraze.
+        Detect hands in an image.
         
         Args:
-            image: Vstupný obraz (numpy.ndarray)
+            image: Input image (numpy.ndarray)
             
         Returns:
-            list: Zoznam detekovaných rúk
-            numpy.ndarray: Anotovaný obraz
+            list: List of detected hands
+            numpy.ndarray: Annotated image
         """
-        # Konverzia na RGB, ak je to potrebné
-        if len(image.shape) == 3 and image.shape[2] == 3:
-            if image.dtype == np.uint8:
-                rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            else:
-                rgb_image = image
-        else:
-            rgb_image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-        
-        # Detekcia rúk
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = self.hands.process(rgb_image)
-        
-        # Príprava výstupu
+
         detected_hands = []
         annotated_image = image.copy()
-        
+
         if results.multi_hand_landmarks:
-            for hand_landmarks in results.multi_hand_landmarks:
-                # Uloženie bodov ruky
-                hand_points = []
-                for landmark in hand_landmarks.landmark:
-                    x, y = int(landmark.x * image.shape[1]), int(landmark.y * image.shape[0])
-                    hand_points.append((x, y))
+            for idx, hand_landmarks in enumerate(results.multi_hand_landmarks):
+                hand_type = results.multi_handedness[idx].classification[0].label  # Get Left/Right hand
                 
-                detected_hands.append(hand_points)
-                
-                # Kreslenie bodov ruky
+                # Extract hand landmarks as a list of (x, y) coordinates
+                hand_points = [
+                    (int(landmark.x * image.shape[1]), int(landmark.y * image.shape[0])) 
+                    for landmark in hand_landmarks.landmark
+                ]
+
+                detected_hands.append((hand_points, hand_type))  # Store with hand type
+
+                # Draw landmarks
                 self.mp_drawing.draw_landmarks(
-                    annotated_image,
-                    hand_landmarks,
-                    self.mp_hands.HAND_CONNECTIONS
+                    annotated_image, hand_landmarks, self.mp_hands.HAND_CONNECTIONS
                 )
-        
+
         return detected_hands, annotated_image
-    
-    def detect_pointing_direction(self, hand_points):
+
+    def detect_pointing_hand(self, detected_hands):
         """
-        Detekcia smeru ukazovania pre jednu ruku.
-        
+        Determines which hand is actively pointing based on arm position and index finger extension.
+
         Args:
-            hand_points: Zoznam bodov ruky
-            
+            detected_hands: List of tuples [(hand_points, hand_type)]
+
         Returns:
-            tuple: Bod začiatku a smeru ukazovania, alebo None ak nie je detekované
+            tuple: (hand_points, hand_type) of the pointing hand, or None if no pointing hand detected.
+        """
+        if not detected_hands:
+            return None  # No hands detected
+
+        print(f"🔎 DEBUG: detected_hands = {detected_hands}")
+
+        pointing_hand = None
+        best_arm_position = float('inf')  # Lower y-value means hand is in front
+
+        for hand_points, hand_type in detected_hands:
+            print(f"🔎 DEBUG: Processing {hand_type} hand")
+
+            if len(hand_points) < 21:
+                continue  # Skip incomplete detections
+
+            # Wrist and index finger landmarks
+            WRIST = 0
+            INDEX_FINGER_TIP = 8
+            INDEX_FINGER_PIP = 6
+            INDEX_FINGER_MCP = 5
+
+            wrist = np.array(hand_points[WRIST])
+            tip = np.array(hand_points[INDEX_FINGER_TIP])
+            pip = np.array(hand_points[INDEX_FINGER_PIP])
+            mcp = np.array(hand_points[INDEX_FINGER_MCP])
+
+            # Measure how extended the index finger is
+            finger_extension = (pip[1] - tip[1]) / (mcp[1] - pip[1] + 1e-6)  # Avoid division by zero
+
+            # Use wrist y-coordinate to check which hand is more forward
+            print(f"🟢 {hand_type} Wrist Position Y: {wrist[1]}, Best_arm_position: {best_arm_position}, Finger Extension Ratio: {finger_extension:.2f}")
+
+            # Prioritize the hand that is in front (smaller y-value means closer to the camera)
+            if wrist[1] < best_arm_position and finger_extension > 0.9:  # Allow slightly bent fingers
+                best_arm_position = wrist[1]
+                pointing_hand = (hand_points, hand_type)  # Select the forward hand with an extended finger
+
+        if pointing_hand:
+            print(f"✅ Pointing hand detected: {pointing_hand[1]}")
+            return pointing_hand
+
+        print("⚠ No pointing hand detected.")
+        return None
+
+        
+    def detect_pointing_direction(self, hand_points, image_shape, objects_info):
+        """
+        Detects the pointing direction and extends the line until it touches a bounding box or reaches the image boundary.
+
+        Args:
+            hand_points: List of hand landmarks
+            image_shape: Tuple (height, width) of the image
+            objects_info: List of detected objects with 'box' info
+
+        Returns:
+            tuple: Start point and extended end point
         """
         if not hand_points or len(hand_points) < 21:
             return None
-        
-        # Indexy pre kľúčové body ruky v MediaPipe
-        WRIST = 0
+
         INDEX_FINGER_TIP = 8
         INDEX_FINGER_PIP = 6
-        INDEX_FINGER_MCP = 5
-        
-        # Získanie bodov
-        wrist = np.array(hand_points[WRIST])
+
         index_tip = np.array(hand_points[INDEX_FINGER_TIP])
         index_pip = np.array(hand_points[INDEX_FINGER_PIP])
-        index_mcp = np.array(hand_points[INDEX_FINGER_MCP])
-        
-        # Výpočet smeru ukazovania (z MCP cez PIP až k špičke prsta)
-        direction_vector = index_tip - index_mcp
-        
-        # Normalizácia vektora
+
+        direction_vector = index_tip - index_pip
         norm = np.linalg.norm(direction_vector)
+
         if norm == 0:
             return None
-        
+
         normalized_direction = direction_vector / norm
-        
-        # Predĺženie vektora pre vizualizáciu
-        extended_point = index_tip + normalized_direction * 200
-        
-        return index_mcp, tuple(map(int, extended_point))
+
+        # Maximum extension distance (image boundaries)
+        height, width = image_shape
+        max_extension = max(height, width)  # Ensure it can extend across the image
+
+        for scale in np.linspace(50, max_extension, num=200):  # Increase steps for finer control
+            extended_point = index_tip + normalized_direction * scale
+
+            # Check if the extended point goes out of bounds
+            x, y = map(int, extended_point)
+            if x < 0 or x >= width or y < 0 or y >= height:
+                break  # Stop at image boundary
+
+            # Check if the line intersects with any bounding box
+            for obj in objects_info:
+                x1, y1, x2, y2 = obj['box']
+                if x1 <= x <= x2 and y1 <= y <= y2:
+                    return index_pip, (x, y)  # Stop at the first detected object
+
+        return index_pip, (x, y)  # If no object is found, stop at the image boundary
     
     def detect_pointing(self, image):
         """
-        Detekcia smeru ukazovania v obraze.
+        Detect pointing gestures in the image.
         
         Args:
-            image: Vstupný obraz
+            image: Input image
             
         Returns:
-            tuple: Bod začiatku a smeru ukazovania, alebo None ak nie je detekované
-            numpy.ndarray: Anotovaný obraz
+            tuple: Start and direction of pointing or None
+            numpy.ndarray: Annotated image
         """
-        # Detekcia rúk
         detected_hands, annotated_image = self.detect_hands(image)
         
-        # Ak neboli detekované ruky, vrátime None
         if not detected_hands:
             return None, annotated_image
         
-        # Pre jednoduchosť berieme len prvú detekovanú ruku
         pointing_info = self.detect_pointing_direction(detected_hands[0])
         
-        # Ak bol detekovaný smer ukazovania, nakreslíme ho
         if pointing_info:
             start_point, end_point = pointing_info
-            cv2.line(annotated_image, 
-                     tuple(map(int, start_point)), 
-                     tuple(map(int, end_point)),
+            cv2.line(annotated_image, tuple(map(int, start_point)), tuple(map(int, end_point)),
                      (255, 0, 0), 2)
         
         return pointing_info, annotated_image
