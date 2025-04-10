@@ -97,12 +97,10 @@ class YOLOWorldDetector(ObjectDetector):
         raise ValueError("Nepodporovaný typ obrazu")
     
     def get_model_info(self):
-        """
-        Získanie informácií o modeli.
-        """
         return {
             'name': self.model_name,
             'type': 'YOLO World',
             'device': self.device,
+            'actual_device': next(self.model.parameters()).device.type,
             'open_vocabulary': True
         }

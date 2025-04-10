@@ -11,6 +11,9 @@ class HandPointingDetector:
         """
         Initialize the hand detector.
         """
+        self.device = "cpu"
+        print(f"[Hands] MediaPipe hand detection initialized. (Running on: {self.device.upper()})")
+
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
             static_image_mode=False,
