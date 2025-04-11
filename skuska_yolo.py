@@ -7,7 +7,7 @@ image = cv2.imread("C:/Users/Lukas Hajduch/Downloads/BachelorThesis/data/images/
 
 for device in ["cpu", "cuda"]:
     print(f"\nTesting on {device.upper()}...")
-    model = YOLOWorld("yolov8x-worldv2").to(device)
+    model = YOLOWorld("yolov8s-worldv2").to(device)
     model.eval()
 
     for _ in range(2):  # run twice to see warmup effect
