@@ -6,12 +6,12 @@ from PIL import Image
 from transformers import OwlViTProcessor, OwlViTForObjectDetection
 
 # Inicializácia modelu
-device = "cuda"
+device = "cpu"
 model = OwlViTForObjectDetection.from_pretrained("google/owlvit-base-patch32").to(device)
 processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
 
 # Definuj, čo hľadať (open-vocabulary)
-query_texts = ["teddy bear"]
+query_texts = ["teddy bear", "cup"]
 
 # Inicializuj kameru
 cap = cv2.VideoCapture(0)
